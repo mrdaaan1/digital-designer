@@ -78,7 +78,11 @@ function applyTextToSlot(slot: TextSlotRef, newText: string) {
   if (!templateParagraph) return;
 
   const lines = newText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
-  if (lines.length === 0) return;
+  if (lines.length === 0) {
+    // Пустой контент для этого слота: не оставляем оригинальный текст
+    // слайда-образца — заменяем на пустой параграф той же стилизации.
+    lines.push('');
+  }
 
   const templateRun = asArray(templateParagraph['a:r'])[0];
 
@@ -140,20 +144,23 @@ export function buildSlideXmlFromPattern(input: SlideRenderInput): string {
   // обходит shapes в порядке их объявления в XML (обычно тот же порядок).
   const fields = [...input.plannedSlide.content];
 
-  if (fields.length > slots.length) {
-    // Дизайн-система переоценила число заполняемых ролей для этого паттерна —
-    // избыточные поля контента будут потеряны. Не бросаем исключение (слайд
-    // всё ещё соберётся корректно), но это сигнал пересмотреть placeholderRoles
-    // паттерна в template_design_systems.
+  if (fields.length !== slots.length) {
+    // Дизайн-система оценила число ролей паттерна неточно относительно
+    // реального числа текстовых блоков слайда-образца. Не бросаем исключение
+    // (слайд всё ещё соберётся: лишние поля отбрасываются, недостающие слоты
+    // очищаются), но это сигнал пересмотреть placeholderRoles паттерна.
     console.warn(
-      `[generate-presentation] паттерн "${input.pattern.patternKey}": ролей контента (${fields.length}) больше, чем текстовых слотов слайда-образца (${slots.length}). Лишние поля будут отброшены.`,
+      `[generate-presentation] паттерн "${input.pattern.patternKey}": ролей контента (${fields.length}) ` +
+        `!= текстовых слотов слайда-образца (${slots.length}).`,
     );
   }
 
-  for (let i = 0; i < slots.length && fields.length > 0; i++) {
+  // Каждый слот слайда-образца обязан быть перезаписан или очищен — иначе
+  // оставшийся оригинальный текст образца (потенциально чужой/конфиденциальный
+  // контент из шаблона) утечёт в сгенерированную презентацию.
+  for (let i = 0; i < slots.length; i++) {
     const field = fields.shift();
-    if (!field) break;
-    applyTextToSlot(slots[i].slot, field.text);
+    applyTextToSlot(slots[i].slot, field ? field.text : '');
   }
 
   const rebuilt = builder.build(parsed);

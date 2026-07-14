@@ -13,9 +13,9 @@ export type ChatMessage = {
 // Модели по умолчанию — переопределяются через env, чтобы не быть привязанными
 // к конкретному провайдеру на случай изменения доступности бесплатных моделей.
 export const ANALYSIS_VISION_MODEL =
-  process.env.OPENROUTER_VISION_MODEL ?? 'google/gemini-2.0-flash-001';
+  process.env.OPENROUTER_VISION_MODEL ?? 'google/gemini-2.5-flash-lite';
 export const CONTENT_MODEL =
-  process.env.OPENROUTER_CONTENT_MODEL ?? 'anthropic/claude-sonnet-4.5';
+  process.env.OPENROUTER_CONTENT_MODEL ?? 'google/gemini-2.5-flash-lite';
 
 const CALL_MAX_ATTEMPTS = 3;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://digital-designer.vercel.app';
