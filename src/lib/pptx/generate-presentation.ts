@@ -41,12 +41,15 @@ type TextSlotRef = {
   paragraphs: any[]; // ссылка на массив a:p данного shape — мутируем на месте
 };
 
-// Собирает все текстовые "слоты" слайда в порядке обхода XML: каждый плейсхолдер
-// или текстовый shape с непустым содержимым — один слот. Множественные
-// параграфы внутри одного shape/плейсхолдера схлопываются в один слот, чтобы
-// многострочный bulletList можно было вставить построчно.
-function collectTextSlots(spTree: any): { key: string; slot: TextSlotRef }[] {
-  const slots: { key: string; slot: TextSlotRef }[] = [];
+type CollectedSlot = { key: string; slot: TextSlotRef; x: number | null; y: number | null };
+
+// Собирает все текстовые "слоты" слайда: каждый плейсхолдер или текстовый
+// shape с непустым содержимым — один слот, с его координатами (для
+// последующей визуальной сортировки). Множественные параграфы внутри одного
+// shape/плейсхолдера схлопываются в один слот, чтобы многострочный
+// bulletList можно было вставить построчно.
+function collectTextSlots(spTree: any): CollectedSlot[] {
+  const slots: CollectedSlot[] = [];
 
   const shapes = asArray(spTree?.['p:sp']);
   for (let i = 0; i < shapes.length; i++) {
@@ -64,10 +67,44 @@ function collectTextSlots(spTree: any): { key: string; slot: TextSlotRef }[] {
       ? `ph:${phNode['@_type'] ?? 'body'}:${phNode['@_idx'] ?? 0}`
       : `shape:${i}`;
 
-    slots.push({ key, slot: { paragraphs } });
+    const xfrm = sp['p:spPr']?.['a:xfrm'];
+    const x = xfrm?.['a:off']?.['@_x'] !== undefined ? Number(xfrm['a:off']['@_x']) : null;
+    const y = xfrm?.['a:off']?.['@_y'] !== undefined ? Number(xfrm['a:off']['@_y']) : null;
+
+    slots.push({ key, slot: { paragraphs }, x, y });
   }
 
   return slots;
+}
+
+// Переупорядочивает слоты в визуальном порядке чтения (колонка за колонкой
+// слева направо, внутри колонки — сверху вниз), а не в порядке объявления в
+// XML. XML-порядок фигур в OOXML не гарантированно совпадает с визуальным —
+// на многоколоночных/карточных слайдах это приводило к тому, что контент
+// одной карточки утекал в текстовые блоки другой (см. PR history). Толерантность
+// группировки в колонки — 5% ширины стандартного слайда (12192000 EMU).
+const COLUMN_TOLERANCE_EMU = 600_000;
+
+function sortSlotsVisually(slots: CollectedSlot[]): CollectedSlot[] {
+  const withCoords = slots.filter((s) => s.x !== null && s.y !== null);
+  const withoutCoords = slots.filter((s) => s.x === null || s.y === null);
+  if (withCoords.length === 0) return slots;
+
+  const sortedByX = [...withCoords].sort((a, b) => (a.x! - b.x!));
+  const columns: CollectedSlot[][] = [];
+  for (const slot of sortedByX) {
+    const lastColumn = columns[columns.length - 1];
+    const lastSlot = lastColumn?.[lastColumn.length - 1];
+    if (lastSlot && Math.abs(slot.x! - lastSlot.x!) <= COLUMN_TOLERANCE_EMU) {
+      lastColumn.push(slot);
+    } else {
+      columns.push([slot]);
+    }
+  }
+  for (const column of columns) column.sort((a, b) => a.y! - b.y!);
+
+  // Слоты без координат (fallback-случай) добавляем в конце, в исходном порядке.
+  return [...columns.flat(), ...withoutCoords];
 }
 
 // Заменяет текст внутри слота. Если newText содержит переводы строк, каждая
@@ -135,11 +172,11 @@ export function buildSlideXmlFromPattern(input: SlideRenderInput): string {
   }
 
   normalizeParagraphContainers(spTree);
-  const slots = collectTextSlots(spTree);
+  const slots = sortSlotsVisually(collectTextSlots(spTree));
 
-  // Сопоставляем роли контента со слотами по порядку появления в XML.
-  // Эвристика: заголовочные роли (heading/title) — в первый слот, остальные —
-  // по порядку. Это соответствует тому, что LLM-анализ paттернов формировал
+  // Сопоставляем роли контента со слотами в визуальном порядке чтения (колонка
+  // за колонкой слева направо, сверху вниз внутри колонки — см. sortSlotsVisually).
+  // Это соответствует тому, что LLM-анализ paттернов формировал
   // placeholderRoles в визуальном порядке (сверху вниз), а collectTextSlots
   // обходит shapes в порядке их объявления в XML (обычно тот же порядок).
   const fields = [...input.plannedSlide.content];
