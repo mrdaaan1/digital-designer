@@ -51,6 +51,7 @@ function HomeContent() {
   const { supabase } = useAuth();
   const router = useRouter();
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [publicTemplates, setPublicTemplates] = useState<TemplateSummary[]>([]);
   const [presentations, setPresentations] = useState<PresentationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -62,6 +63,7 @@ function HomeContent() {
     if (res.ok) {
       const data = await res.json();
       setTemplates(data.templates ?? []);
+      setPublicTemplates(data.publicTemplates ?? []);
     }
     setLoading(false);
   }, []);
@@ -154,11 +156,32 @@ function HomeContent() {
         {uploadError && <p className="text-danger text-sm mt-3">{uploadError}</p>}
       </section>
 
+      {publicTemplates.length > 0 && (
+        <section className="flex flex-col gap-3 animate-fade-in-up">
+          <div>
+            <h2 className="font-semibold text-lg">Готовые стили</h2>
+            <p className="text-muted text-sm">Нет своего шаблона? Выберите один из готовых — и сразу переходите к генерации.</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {publicTemplates.map((template) => (
+              <Link
+                key={template.id}
+                href={`/templates/${template.id}`}
+                className="card-elevated card-elevated-interactive rounded-xl px-4 py-3 flex items-center justify-between"
+              >
+                <span className="font-medium">{template.name}</span>
+                <span className={`text-sm ${STATUS_COLORS[template.status]}`}>{STATUS_LABELS[template.status]}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="flex flex-col gap-3 animate-fade-in-up">
         <h2 className="font-semibold text-lg">Ваши шаблоны</h2>
         {loading && <p className="text-muted text-sm">Загрузка…</p>}
         {!loading && templates.length === 0 && (
-          <p className="text-muted text-sm">Пока нет ни одного шаблона — загрузите первый выше.</p>
+          <p className="text-muted text-sm">Пока нет ни одного своего шаблона — загрузите выше или используйте готовый стиль.</p>
         )}
         <div className="flex flex-col gap-2">
           {templates.map((template) => (
