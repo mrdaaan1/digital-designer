@@ -31,7 +31,13 @@ export function textPart(text: string): TextContentPart {
 type CallOptions = {
   jsonSchema?: { name: string; schema: Record<string, unknown> };
   temperature?: number;
+  maxTokens?: number;
 };
+
+// Дефолт модели часто недостаточен для развёрнутых JSON-ответов (анализ
+// дизайн-системы с 7+ паттернами по 10+ ролей каждый) — без явного max_tokens
+// ответ обрезается на середине и JSON.parse падает.
+const DEFAULT_MAX_TOKENS = 8000;
 
 export async function callOpenRouter(
   model: string,
@@ -67,6 +73,7 @@ export async function callOpenRouter(
           model,
           messages,
           temperature: options?.temperature ?? 0.4,
+          max_tokens: options?.maxTokens ?? DEFAULT_MAX_TOKENS,
           ...(responseFormat ? { response_format: responseFormat } : {}),
         }),
       });
@@ -95,11 +102,14 @@ export async function callOpenRouterJson<T>(
   messages: ChatMessage[],
   jsonSchema: { name: string; schema: Record<string, unknown> },
   temperature?: number,
+  maxTokens?: number,
 ): Promise<T> {
-  const raw = await callOpenRouter(model, messages, { jsonSchema, temperature });
+  const raw = await callOpenRouter(model, messages, { jsonSchema, temperature, maxTokens });
   try {
     return JSON.parse(raw) as T;
   } catch {
-    throw new Error(`Модель вернула некорректный JSON: ${raw.slice(0, 300)}`);
+    throw new Error(
+      `Модель вернула некорректный JSON (возможно, ответ обрезан по длине): ${raw.slice(0, 300)}`,
+    );
   }
 }

@@ -103,10 +103,13 @@ export async function analyzeDesignSystem(
     { role: 'user', content: userContent },
   ];
 
+  // Ответ содержит до 8 паттернов по 10+ ролей каждый — заметно объёмнее
+  // дефолтного лимита токенов, из-за чего JSON обрезался на середине.
   return callOpenRouterJson<DesignSystemAnalysis>(
     ANALYSIS_VISION_MODEL,
     messages,
     DESIGN_SYSTEM_JSON_SCHEMA,
     0.3,
+    12000,
   );
 }
