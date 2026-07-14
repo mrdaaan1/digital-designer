@@ -17,7 +17,11 @@ export const ANALYSIS_VISION_MODEL =
 export const CONTENT_MODEL =
   process.env.OPENROUTER_CONTENT_MODEL ?? 'google/gemini-2.5-flash-lite';
 
-const CALL_MAX_ATTEMPTS = 3;
+// Дешёвые/бесплатные модели через OpenRouter нередко обрывают генерацию
+// транзиентным finish_reason=error на середине стрима — 5 попыток с backoff
+// заметно надёжнее 3 для длинных structured-JSON ответов (дизайн-система,
+// контент-план), где вероятность обрыва растёт вместе с длиной генерации.
+const CALL_MAX_ATTEMPTS = 5;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://digital-designer-39i1.vercel.app';
 
 export function imagePart(base64Png: string): ImageContentPart {
@@ -84,8 +88,16 @@ export async function callOpenRouter(
       }
 
       const data = await res.json();
-      const text: string | undefined = data.choices?.[0]?.message?.content;
+      const choice = data.choices?.[0];
+      const text: string | undefined = choice?.message?.content;
       if (!text) throw new Error('OpenRouter returned empty response');
+      // finish_reason "error" — провайдер оборвал генерацию транзиентным сбоем
+      // на середине стрима (нередко для дешёвых/бесплатных моделей); ответ
+      // формально приходит с 200 OK, но content обрублен и невалиден как JSON.
+      // Бросаем исключение явно, чтобы сработал retry ниже.
+      if (choice?.finish_reason === 'error') {
+        throw new Error(`OpenRouter прервал генерацию (finish_reason=error), попытка ${attempt}/${CALL_MAX_ATTEMPTS}`);
+      }
       return text.trim();
     } catch (e) {
       lastError = e;
