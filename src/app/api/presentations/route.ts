@@ -6,6 +6,24 @@ import { runPresentationGenerationJob } from '@/lib/pipeline/generate-presentati
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
+export async function GET() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const { data: presentations, error } = await supabase
+    .from('presentations')
+    .select('id, title, status, created_at, template_id, templates(name)')
+    .eq('owner_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ presentations });
+}
+
 // Создаёт презентацию по брифу пользователя и уже готовой дизайн-системе шаблона.
 // Принимает multipart/form-data: templateId, contentBrief, опционально contentFile.
 export async function POST(request: Request) {

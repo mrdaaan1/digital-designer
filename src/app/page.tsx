@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AuthGate } from '@/components/AuthGate';
 import { useAuth } from '@/lib/auth-context';
-import type { TemplateSummary, TemplateStatus } from '@/lib/types';
+import type { TemplateSummary, TemplateStatus, PresentationStatus } from '@/lib/types';
 
 const STATUS_LABELS: Record<TemplateStatus, string> = {
   uploaded: 'Загружен',
@@ -21,10 +21,37 @@ const STATUS_COLORS: Record<TemplateStatus, string> = {
   failed: 'text-danger',
 };
 
+type PresentationSummary = {
+  id: string;
+  title: string;
+  status: PresentationStatus;
+  created_at: string;
+  templates: { name: string } | null;
+};
+
+const PRESENTATION_STATUS_LABELS: Record<PresentationStatus, string> = {
+  pending: 'В очереди',
+  planning: 'Планирование…',
+  generating: 'Генерация…',
+  rendering: 'Сборка…',
+  ready: 'Готова',
+  failed: 'Ошибка',
+};
+
+const PRESENTATION_STATUS_COLORS: Record<PresentationStatus, string> = {
+  pending: 'text-muted',
+  planning: 'text-accent',
+  generating: 'text-accent',
+  rendering: 'text-accent',
+  ready: 'text-success',
+  failed: 'text-danger',
+};
+
 function HomeContent() {
   const { supabase } = useAuth();
   const router = useRouter();
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [presentations, setPresentations] = useState<PresentationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -39,9 +66,18 @@ function HomeContent() {
     setLoading(false);
   }, []);
 
+  const loadPresentations = useCallback(async () => {
+    const res = await fetch('/api/presentations');
+    if (res.ok) {
+      const data = await res.json();
+      setPresentations(data.presentations ?? []);
+    }
+  }, []);
+
   useEffect(() => {
     loadTemplates();
-  }, [loadTemplates]);
+    loadPresentations();
+  }, [loadTemplates, loadPresentations]);
 
   // Пока хотя бы один шаблон в статусе "analyzing" — обновляем список раз в 3с,
   // чтобы карточка сама переключилась на "Готов" без ручного refresh.
@@ -137,6 +173,31 @@ function HomeContent() {
           ))}
         </div>
       </section>
+
+      {presentations.length > 0 && (
+        <section className="flex flex-col gap-3 animate-fade-in-up">
+          <h2 className="font-semibold text-lg">Ваши презентации</h2>
+          <div className="flex flex-col gap-2">
+            {presentations.map((presentation) => (
+              <Link
+                key={presentation.id}
+                href={`/presentations/${presentation.id}`}
+                className="card-elevated card-elevated-interactive rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{presentation.title}</p>
+                  {presentation.templates?.name && (
+                    <p className="text-muted text-xs mt-0.5">Шаблон: {presentation.templates.name}</p>
+                  )}
+                </div>
+                <span className={`text-sm shrink-0 ${PRESENTATION_STATUS_COLORS[presentation.status]}`}>
+                  {PRESENTATION_STATUS_LABELS[presentation.status]}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
