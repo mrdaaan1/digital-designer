@@ -50,11 +50,14 @@ export async function generateContentPlan(
     },
   ];
 
+  // Полный план (обычно 6-14 слайдов, часть паттернов — по 10+ текстовых
+  // ролей) заметно объёмнее дефолтного лимита токенов.
   const plan = await callOpenRouterJson<ContentPlan>(
     CONTENT_MODEL,
     messages,
     CONTENT_PLAN_JSON_SCHEMA,
     0.6,
+    12000,
   );
 
   const validKeys = new Set(patterns.map((p) => p.patternKey));
