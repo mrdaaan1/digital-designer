@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { TEMPLATES_BUCKET } from '@/lib/storage/buckets';
 import { runTemplateAnalysisJob } from '@/lib/pipeline/analyze-template-job';
 
@@ -10,12 +11,20 @@ export const maxDuration = 300; // анализ шаблона: рендер + L
 // Создаёт запись templates, загружает файл в Storage, запускает анализ
 // дизайн-системы синхронно (await) — для хакатон-масштаба этого достаточно,
 // прогресс всё равно отслеживается через pipeline_jobs и polling на клиенте.
+//
+// Пишем через admin-клиент (service_role): вся цепочка анализа шаблона —
+// системная фоновая операция, а не прямое действие пользователя от его лица,
+// поэтому RLS-политики на template_design_systems/slide_patterns/pipeline_jobs
+// сознательно ограничены только service_role (владение проверяется явно через
+// owner_id, а не через RLS-контекст запроса).
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const admin = createAdminClient();
 
   const formData = await request.formData();
   const file = formData.get('file');
@@ -47,18 +56,18 @@ export async function POST(request: Request) {
   }
 
   const storagePath = `${user.id}/${templateRow.id}/original.pptx`;
-  const { error: uploadError } = await supabase.storage.from(TEMPLATES_BUCKET).upload(storagePath, buffer, {
+  const { error: uploadError } = await admin.storage.from(TEMPLATES_BUCKET).upload(storagePath, buffer, {
     contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     upsert: true,
   });
   if (uploadError) {
-    await supabase.from('templates').delete().eq('id', templateRow.id);
+    await admin.from('templates').delete().eq('id', templateRow.id);
     return NextResponse.json({ error: `Не удалось загрузить файл: ${uploadError.message}` }, { status: 500 });
   }
 
-  await supabase.from('templates').update({ storage_path: storagePath, status: 'analyzing' }).eq('id', templateRow.id);
+  await admin.from('templates').update({ storage_path: storagePath, status: 'analyzing' }).eq('id', templateRow.id);
 
-  const { data: jobRow, error: jobError } = await supabase
+  const { data: jobRow, error: jobError } = await admin
     .from('pipeline_jobs')
     .insert({ job_type: 'template_analysis', template_id: templateRow.id, status: 'queued', progress: 0 })
     .select('id')
@@ -72,7 +81,7 @@ export async function POST(request: Request) {
   // maxDuration. Прогресс всё равно обновляется в pipeline_jobs по шагам,
   // так что клиент может параллельно опрашивать статус, если запрос долгий.
   try {
-    await runTemplateAnalysisJob(supabase, templateRow.id, jobRow.id);
+    await runTemplateAnalysisJob(admin, templateRow.id, jobRow.id);
   } catch (err) {
     console.error('template analysis job failed', err);
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { PRESENTATIONS_BUCKET } from '@/lib/storage/buckets';
 import { runPresentationGenerationJob } from '@/lib/pipeline/generate-presentation-job';
 
@@ -32,6 +33,8 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const admin = createAdminClient();
 
   const formData = await request.formData();
   const templateId = formData.get('templateId') as string | null;
@@ -69,15 +72,15 @@ export async function POST(request: Request) {
   if (contentFile instanceof Blob && (contentFile as File).name) {
     const buffer = Buffer.from(await contentFile.arrayBuffer());
     const path = `${user.id}/${presentationRow.id}/content-source`;
-    const { error: uploadError } = await supabase.storage.from(PRESENTATIONS_BUCKET).upload(path, buffer, {
+    const { error: uploadError } = await admin.storage.from(PRESENTATIONS_BUCKET).upload(path, buffer, {
       upsert: true,
     });
     if (!uploadError) {
-      await supabase.from('presentations').update({ content_file_storage_path: path }).eq('id', presentationRow.id);
+      await admin.from('presentations').update({ content_file_storage_path: path }).eq('id', presentationRow.id);
     }
   }
 
-  const { data: jobRow, error: jobError } = await supabase
+  const { data: jobRow, error: jobError } = await admin
     .from('pipeline_jobs')
     .insert({ job_type: 'presentation_generation', presentation_id: presentationRow.id, status: 'queued', progress: 0 })
     .select('id')
@@ -87,7 +90,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await runPresentationGenerationJob(supabase, presentationRow.id, jobRow.id);
+    await runPresentationGenerationJob(admin, presentationRow.id, jobRow.id);
   } catch (err) {
     console.error('presentation generation job failed', err);
   }
