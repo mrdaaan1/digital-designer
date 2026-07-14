@@ -18,7 +18,7 @@ export const CONTENT_MODEL =
   process.env.OPENROUTER_CONTENT_MODEL ?? 'google/gemini-2.5-flash-lite';
 
 const CALL_MAX_ATTEMPTS = 3;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://digital-designer.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://digital-designer-39i1.vercel.app';
 
 export function imagePart(base64Png: string): ImageContentPart {
   return { type: 'image_url', image_url: { url: `data:image/png;base64,${base64Png}` } };
