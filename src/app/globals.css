@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f6f8;
+  --foreground: #0a0d14;
+  --card: #ffffff;
+  --card-border: rgba(10, 13, 20, 0.08);
+  --muted: #656b76;
+  --accent: #0077ff;
+  --accent-dark: #0059c1;
+  --accent-soft: #e8f1ff;
+  --danger: #e5493f;
+  --success: #2ba861;
+  --shadow-color: 220 30% 12%;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-dark: var(--accent-dark);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-geist-sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b0d12;
+    --foreground: #eef1f6;
+    --card: #141821;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --muted: #9099a8;
+    --accent: #4d9bff;
+    --accent-dark: #a8cdff;
+    --accent-soft: #16233a;
+    --danger: #ff6b61;
+    --success: #4fce88;
+    --shadow-color: 220 40% 2%;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #0b0d12;
+  --foreground: #eef1f6;
+  --card: #141821;
+  --card-border: rgba(255, 255, 255, 0.08);
+  --muted: #9099a8;
+  --accent: #4d9bff;
+  --accent-dark: #a8cdff;
+  --accent-soft: #16233a;
+  --danger: #ff6b61;
+  --success: #4fce88;
+  --shadow-color: 220 40% 2%;
+}
+
+:root[data-theme="light"] {
+  --background: #f5f6f8;
+  --foreground: #0a0d14;
+  --card: #ffffff;
+  --card-border: rgba(10, 13, 20, 0.08);
+  --muted: #656b76;
+  --accent: #0077ff;
+  --accent-dark: #0059c1;
+  --accent-soft: #e8f1ff;
+  --danger: #e5493f;
+  --success: #2ba861;
+  --shadow-color: 220 30% 12%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+.card-elevated {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  box-shadow:
+    0 1px 2px hsl(var(--shadow-color) / 0.06),
+    0 8px 24px -12px hsl(var(--shadow-color) / 0.18);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.card-elevated-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow:
+    0 2px 4px hsl(var(--shadow-color) / 0.08),
+    0 16px 32px -14px hsl(var(--shadow-color) / 0.28);
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animate-scale-in {
+    animation: none;
+  }
+  .card-elevated-interactive:hover {
+    transform: none;
+  }
+}

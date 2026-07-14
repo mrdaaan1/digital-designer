@@ -1,0 +1,14 @@
+{
+  "name": "digital-designer-render-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Отдельный сервис для рендера PPTX-слайдов в PNG через LibreOffice headless — используется только при анализе шаблона (vision), не в горячем пути генерации.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}
